@@ -1,0 +1,18 @@
+# Example Data Template  
+# This file shows the expected structure for species_abundance.csv
+
+# Column names and descriptions:
+# sample_id: Sample identifier matching samples data
+# species: Species name (genus and species)
+# abundance: Number of individuals counted
+# life_stage: Life stage if applicable (adult, juvenile, etc.)
+# notes: Any additional notes
+
+# Example data format:
+# sample_id,species,abundance,life_stage,notes
+# SAMPLE001,Hydrobia ulvae,45,adult,
+# SAMPLE001,Potamopyrgus antipodarum,12,adult,
+# SAMPLE001,Bithynia tentaculata,8,mixed,
+# SAMPLE002,Hydrobia ulvae,38,adult,
+# SAMPLE002,Potamopyrgus antipodarum,15,adult,
+# SAMPLE003,Hydrobia ulvae,5,adult,Low abundance

@@ -1,0 +1,242 @@
+---
+title: "Microgastropods as Environmental Indicators"
+author:
+  - name: "Kelmo et al."
+    affiliation: "GEEMCO Lab"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: united
+    code_folding: hide
+  pdf_document:
+    toc: true
+    number_sections: true
+bibliography: references.bib
+csl: ecology.csl
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 8,
+  fig.height = 6,
+  dpi = 300
+)
+
+# Load required packages
+library(tidyverse)
+library(here)
+library(knitr)
+library(patchwork)
+```
+
+# Abstract
+
+**Background:** *Provide context about microgastropods and their potential as environmental indicators.*
+
+**Methods:** *Describe sampling methods, study sites, and analytical approaches.*
+
+**Results:** *Summarize key findings about diversity patterns and environmental relationships.*
+
+**Conclusions:** *State main conclusions about microgastropods as environmental indicators.*
+
+**Keywords:** microgastropods, environmental indicators, biodiversity, freshwater ecology, community ecology
+
+# Introduction
+
+## Background
+
+Microgastropods represent an important but often overlooked component of aquatic ecosystems. Their sensitivity to environmental conditions makes them potentially valuable as bioindicators.
+
+## Research Questions
+
+1. How do microgastropod communities vary across environmental gradients?
+2. Which environmental variables best predict microgastropod diversity?
+3. Can specific species serve as indicators of environmental conditions?
+
+## Objectives
+
+- Characterize microgastropod community composition across study sites
+- Analyze relationships between diversity and environmental variables
+- Identify potential indicator species
+
+# Methods
+
+## Study Area
+
+*Describe the geographic location, climate, and habitat characteristics of study sites.*
+
+## Sampling Design
+
+*Detail the sampling methodology, including:*
+- Number of sites sampled
+- Sampling dates and frequency
+- Collection methods
+- Sample size per site
+
+## Environmental Variables
+
+*List and describe measured environmental variables:*
+- Water quality parameters (pH, temperature, dissolved oxygen, conductivity)
+- Substrate characteristics
+- Vegetation coverage
+- Other relevant factors
+
+## Laboratory Methods
+
+*Describe specimen processing and identification procedures.*
+
+## Data Analysis
+
+```{r load-data, eval=FALSE}
+# Load processed data
+diversity_data <- read_csv(here("data", "processed", "diversity_with_metadata.csv"))
+community_matrix <- read_csv(here("data", "processed", "community_matrix.csv"))
+environmental_matrix <- read_csv(here("data", "processed", "environmental_matrix.csv"))
+```
+
+### Diversity Indices
+
+Species richness, Shannon diversity, Simpson diversity, and evenness were calculated using the `vegan` package.
+
+### Ordination Analysis
+
+Non-metric multidimensional scaling (NMDS) was used to visualize community composition patterns.
+
+### Statistical Tests
+
+- Correlation analyses between diversity indices and environmental variables
+- Environmental fitting to ordination results
+- Indicator species analysis
+
+# Results
+
+## Community Composition
+
+```{r community-overview, eval=FALSE}
+# Summary statistics
+summary_stats <- diversity_data %>%
+  summarise(
+    n_sites = n_distinct(site_id),
+    mean_richness = mean(richness, na.rm = TRUE),
+    sd_richness = sd(richness, na.rm = TRUE),
+    mean_shannon = mean(shannon, na.rm = TRUE),
+    sd_shannon = sd(shannon, na.rm = TRUE)
+  )
+
+kable(summary_stats, caption = "Summary of diversity indices across all sites")
+```
+
+## Diversity Patterns
+
+### Species Richness
+
+```{r richness-plot, eval=FALSE, fig.cap="Distribution of species richness across sampling sites"}
+ggplot(diversity_data, aes(x = site_id, y = richness)) +
+  geom_boxplot(fill = "steelblue", alpha = 0.7) +
+  geom_jitter(width = 0.2, alpha = 0.5) +
+  labs(
+    title = "Species Richness by Site",
+    x = "Site",
+    y = "Species Richness"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+### Shannon Diversity
+
+*Present results for Shannon diversity patterns.*
+
+## Environmental Relationships
+
+```{r diversity-environment, eval=FALSE, fig.cap="Relationships between diversity and environmental variables"}
+# Example: Shannon diversity vs temperature
+ggplot(diversity_data, aes(x = temperature, y = shannon)) +
+  geom_point(size = 3, alpha = 0.6) +
+  geom_smooth(method = "lm", se = TRUE) +
+  labs(
+    title = "Shannon Diversity vs Temperature",
+    x = "Temperature (°C)",
+    y = "Shannon Diversity Index"
+  ) +
+  theme_bw()
+```
+
+## Ordination Results
+
+```{r ordination, eval=FALSE, fig.cap="NMDS ordination of microgastropod communities"}
+# NMDS plot would be generated here
+# Include interpretation of ordination axes and environmental vectors
+```
+
+## Indicator Species
+
+*Present results of indicator species analysis, identifying species associated with specific environmental conditions.*
+
+# Discussion
+
+## Main Findings
+
+*Interpret the key results in the context of existing literature.*
+
+## Microgastropods as Environmental Indicators
+
+*Discuss the implications for using microgastropods as bioindicators:*
+- Sensitivity to environmental changes
+- Practical considerations for monitoring
+- Advantages and limitations
+
+## Comparison with Other Studies
+
+*Compare findings with previous research on microgastropods or similar taxa.*
+
+## Limitations
+
+*Acknowledge limitations of the study:*
+- Sampling constraints
+- Geographic scope
+- Temporal resolution
+- Other considerations
+
+## Future Directions
+
+*Suggest avenues for future research.*
+
+# Conclusions
+
+*Provide clear, concise conclusions addressing the research questions.*
+
+# Acknowledgments
+
+*Acknowledge funding sources, field assistants, and other contributors.*
+
+# References
+
+*References will be automatically generated from the bibliography file.*
+
+# Supplementary Materials
+
+## Supplementary Tables
+
+```{r supplementary-tables, eval=FALSE}
+# Include additional tables if needed
+```
+
+## Supplementary Figures
+
+```{r supplementary-figures, eval=FALSE}
+# Include additional figures if needed
+```
+
+---
+
+## Session Information
+
+```{r session-info}
+sessionInfo()
+```

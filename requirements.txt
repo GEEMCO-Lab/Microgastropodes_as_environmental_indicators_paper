@@ -1,0 +1,27 @@
+# R Package Dependencies
+# Install these packages using: install.packages(c("package1", "package2", ...))
+
+# Data manipulation and visualization
+tidyverse     # Collection of R packages for data science (includes dplyr, ggplot2, tidyr, readr, etc.)
+here          # Easy file path management
+
+# Statistical and ecological analyses
+vegan         # Community ecology analyses (ordination, diversity indices, etc.)
+
+# Plotting and visualization
+ggplot2       # Grammar of graphics plotting (included in tidyverse)
+patchwork     # Combine multiple plots
+corrplot      # Correlation matrix visualization
+scales        # Scale functions for visualization
+
+# Document generation
+knitr         # Dynamic report generation
+rmarkdown     # R Markdown documents
+quarto        # Quarto publishing system
+
+# Optional but recommended packages
+# indicspecies  # Indicator species analysis
+# openxlsx      # Excel file export
+# broom         # Tidy statistical output
+# ggpubr        # Publication-ready plots
+# viridis       # Color-blind friendly palettes

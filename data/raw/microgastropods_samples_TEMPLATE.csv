@@ -1,0 +1,20 @@
+# Example Data Template
+# This file shows the expected structure for microgastropods_samples.csv
+# Remove the # symbols and replace with actual data
+
+# Column names and descriptions:
+# sample_id: Unique identifier for each sample (e.g., SAMPLE001)
+# site_id: Site identifier (e.g., SITE01)
+# date: Sampling date in YYYY-MM-DD format
+# latitude: Latitude in decimal degrees
+# longitude: Longitude in decimal degrees
+# collector: Name of person who collected the sample
+# habitat_type: Description of habitat (e.g., stream, pond, lake)
+# substrate: Type of substrate (e.g., sand, mud, gravel)
+# notes: Any additional notes about the sample
+
+# Example data format:
+# sample_id,site_id,date,latitude,longitude,collector,habitat_type,substrate,notes
+# SAMPLE001,SITE01,2023-06-15,-12.345,45.678,J. Smith,stream,gravel,Clear water
+# SAMPLE002,SITE01,2023-06-15,-12.345,45.678,J. Smith,stream,gravel,Fast flow
+# SAMPLE003,SITE02,2023-06-16,-12.350,45.680,M. Jones,pond,mud,Shallow area

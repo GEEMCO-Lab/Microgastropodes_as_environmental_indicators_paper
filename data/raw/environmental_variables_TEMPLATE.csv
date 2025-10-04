@@ -1,0 +1,19 @@
+# Example Data Template
+# This file shows the expected structure for environmental_variables.csv
+
+# Column names and descriptions:
+# site_id: Site identifier matching samples data
+# variable: Name of environmental variable
+# value: Measured value
+# unit: Unit of measurement
+# date: Date of measurement in YYYY-MM-DD format
+# method: Method or instrument used for measurement
+
+# Example data format:
+# site_id,variable,value,unit,date,method
+# SITE01,temperature,18.5,celsius,2023-06-15,thermometer
+# SITE01,pH,7.2,pH_units,2023-06-15,pH_meter
+# SITE01,dissolved_oxygen,8.3,mg/L,2023-06-15,DO_meter
+# SITE01,conductivity,250,μS/cm,2023-06-15,conductivity_meter
+# SITE02,temperature,20.1,celsius,2023-06-16,thermometer
+# SITE02,pH,7.5,pH_units,2023-06-16,pH_meter
