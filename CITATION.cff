@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: "If you use this software or data, please cite it as below."
+type: dataset
+title: "Microgastropods as Environmental Indicators"
+authors:
+  - family-names: "Kelmo"
+    given-names: "et al."
+    affiliation: "GEEMCO Lab"
+repository-code: "https://github.com/GEEMCO-Lab/Microgastropodes_as_environmental_indicators_paper"
+abstract: "Research data and analysis code for investigating microgastropods as environmental indicators in aquatic ecosystems."
+keywords:
+  - microgastropods
+  - environmental indicators
+  - biodiversity
+  - freshwater ecology
+  - community ecology
+  - R
+  - reproducible research
+license: MIT
+version: 1.0.0
+date-released: "2024"
