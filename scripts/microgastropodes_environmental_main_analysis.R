@@ -1,8 +1,17 @@
-# R Script: kelmo_environment_analysis2_5.R
+# R Script: microgastropodes_environmental_main_analysis.R
 # Author: Eduardo HC Galvao - eduardohcgalvao@gmail.com
-# Version: 3.0 04/10/2025
+# Version: 3.5 04/10/2025
 # Date: 30/09/2025 (dd/mm/yyyy)
-# Description: Script for analysis of environmental and biological data.
+# Description: Comprehensive multivariate analysis of microgastropod community 
+# structure in relation to environmental variables across wet and dry seasons.
+# Performs VIF-based variable selection, canonical correspondence analysis (CCA),
+# NMDS ordination with environmental fitting, PERMANOVA tests, diversity indices
+# comparison, and SIMPER analysis to identify key species driving seasonal differences.
+
+# Input: environmental_data.csv, environmental_data_average_macronutrients.csv,
+# microgastropodes_abundance_matrix.csv
+# Output: CCA_biplot.png, NMDS_plot.png, PERMANOVA_results.csv,
+# diversity_indices.csv, SIMPER_results.csv
 
 # If one the following packages are not installed run:
 # install.packages("package")
@@ -26,20 +35,19 @@ set.seed(123) # For reproducibility
 # 7. Kruskal-Wallis or ANOVA for diversity indices across seasons
 # 8. SIMPER analysis to identify species contributing to differences
 
-######################### Load and prepare data #########################
+###########################################################################
+######################### Load and prepare data ###########################
+###########################################################################
 
 # Load abiotic and biotic data
-abiotic_data <- read.csv("C:/Users/Kelmo/Desktop/analises_eduardo/dados/abiotic_data_formated.csv")
-biotic_data <- read.csv("C:/Users/Kelmo/Desktop/analises_eduardo/dados/biotic_data_formated.csv")
+env_macro_data <- read.csv("C:/Users/Usuário/Desktop/Profissional/lab_geemco/Microgastropodes_as_environmental_indicators_paper/data/environmental_data_average_macronutrients.csv")
+env_var_data <- read.csv("C:/Users/Usuário/Desktop/Profissional/lab_geemco/Microgastropodes_as_environmental_indicators_paper/data/environmental_variables_data.csv")
+community_data <- read.csv("C:/Users/Usuário/Desktop/Profissional/lab_geemco/Microgastropodes_as_environmental_indicators_paper/data/microgastropodes_abundance_matrix.csv")
 
 # Transform biotic data from wide to long format
 # Column names: species, then sampling points with season codes (A=Wet, O=Dry)
-species_names <- biotic_data[,1]
-abundance_data <- biotic_data[,-1]
-
-# Check for species with zero total abundance (all sampling points = 0)
-row_sums <- rowSums(abundance_data, na.rm = TRUE)
-zero_abundance_species <- species_names[row_sums == 0]
+species_names <- community_data[,1]
+abundance_data <- community_data[,-1]
 
 # Create sampling point information
 sampling_points <- colnames(abundance_data)
@@ -66,44 +74,62 @@ site_season_data <- data.frame(
   stringsAsFactors = FALSE
 )
 
+# Add environment mapping for macronutrients merge
+# Map sites to environments based on the data structure
+site_to_environment <- data.frame(
+  site = c("N1", "N2", "N3", "N4", "C5", "C6", "C7", "C8", "C9", "C10", "S1", "S2", "S3", "S4", "S5"),
+  environment = c(rep("Serinhaem", 4), rep("Sorojo", 6), rep("Marau", 5)),
+  stringsAsFactors = FALSE
+)
+
+# Add environment to site_season_data
+site_season_data <- merge(site_season_data, site_to_environment, by = "site", all.x = TRUE)
+
 # Merge both biotic and abiotic tables
 # Verify data types
-abiotic_data$sampling_points <- as.character(abiotic_data$sampling_points)
-abiotic_data$season <- as.factor(abiotic_data$season)
-abiotic_data$temperature <- as.numeric(abiotic_data$temperature)
-abiotic_data$salinity <- as.numeric(abiotic_data$salinity)
-abiotic_data$pH <- as.numeric(abiotic_data$pH)
-abiotic_data$dissolved_o2 <- as.numeric(abiotic_data$dissolved_o2)
-abiotic_data$suspended_solids <- as.numeric(abiotic_data$suspended_solids)
-abiotic_data$sediment_particle_size <- as.numeric(abiotic_data$sediment_particle_size)
+env_var_data$sampling_points <- as.character(env_var_data$sampling_points)
+env_var_data$season <- as.factor(env_var_data$season)
+env_var_data$temperature <- as.numeric(env_var_data$temperature)
+env_var_data$salinity <- as.numeric(env_var_data$salinity)
+env_var_data$pH <- as.numeric(env_var_data$pH)
+env_var_data$dissolved_o2 <- as.numeric(env_var_data$dissolved_o2)
+env_var_data$suspended_solids <- as.numeric(env_var_data$suspended_solids)
+env_var_data$sediment_particle_size <- as.numeric(env_var_data$sediment_particle_size)
 
-# Convert season in abiotic_data to match our format (Wet/Dry with capital letters)
-abiotic_data$season <- as.character(abiotic_data$season)
-abiotic_data$season <- ifelse(tolower(abiotic_data$season) %in% c("wet"), "Wet",
-                             ifelse(tolower(abiotic_data$season) %in% c("dry"), "Dry", 
-                                   abiotic_data$season))
+# Convert season in env_var_data to match format (Wet/Dry with capital letters)
+env_var_data$season <- as.character(env_var_data$season)
+env_var_data$season <- ifelse(tolower(env_var_data$season) %in% c("wet"), "Wet",
+                             ifelse(tolower(env_var_data$season) %in% c("dry"), "Dry", 
+                                   env_var_data$season))
 
-# Merge environmental data with site-season information by BOTH site and season
-combined_data <- merge(site_season_data, abiotic_data, 
+# Merge environmental variables data with site-season information
+combined_data <- merge(site_season_data, env_var_data, 
                       by.x = c("site", "season"), by.y = c("sampling_points", "season"), 
-                      suffixes = c("", "_abiotic"))
+                      suffixes = c("", "_env_var"))
+
+# Merge macronutrients data with combined data by environment and season
+combined_data <- merge(combined_data, env_macro_data, 
+                      by = c("environment", "season"), 
+                      suffixes = c("", "_macro"))
 
 # Ensure the order matches the community matrix
 combined_data <- combined_data[match(site_season_data$sampling_points, combined_data$sampling_points),]
 
-# Explicitly use the season values (should already be correct from merge)
-# combined_data$season should now have the correct Wet/Dry values from abiotic data
-
-# Create environmental matrix for analyses
-env_matrix <- combined_data[, c("temperature", "salinity", "pH", "dissolved_o2", "suspended_solids", "sediment_particle_size")]
+# Create environmental matrix for analyses (including macronutrients)
+env_matrix <- combined_data[, c("temperature", "salinity", "pH", "dissolved_o2", "suspended_solids", 
+                               "sediment_particle_size", "Mg", "K", "Ca", "P", "Al", "V", "B", "Fe", "Cu")]
 rownames(env_matrix) <- combined_data$sampling_points
 
-######################### Environmental Variables Barplots #########################
-# Prepare data for environmental barplots
+################################################################################
+####################### Environmental Variables Barplots #######################
+################################################################################
+
+# Prepare data for environmental barplots (including macronutrients)
 env_plot_data <- combined_data %>%
   select(sampling_points, site, season, temperature, salinity, pH, dissolved_o2, 
-         suspended_solids, sediment_particle_size) %>%
-  pivot_longer(cols = c(temperature, salinity, pH, dissolved_o2, suspended_solids, sediment_particle_size),
+         suspended_solids, sediment_particle_size, Mg, K, Ca, P, Al, V, B, Fe, Cu) %>%
+  pivot_longer(cols = c(temperature, salinity, pH, dissolved_o2, suspended_solids, sediment_particle_size,
+                       Mg, K, Ca, P, Al, V, B, Fe, Cu),
                names_to = "variable", values_to = "value") %>%
   mutate(
     variable_label = case_when(
@@ -113,17 +139,28 @@ env_plot_data <- combined_data %>%
       variable == "dissolved_o2" ~ "Dissolved O2 (mg/L)",
       variable == "suspended_solids" ~ "Suspended solids (mg/L)",
       variable == "sediment_particle_size" ~ "Sediment particle size (φ)",
+      variable == "Mg" ~ "Magnesium (mg/L)",
+      variable == "K" ~ "Potassium (mg/L)",
+      variable == "Ca" ~ "Calcium (mg/L)",
+      variable == "P" ~ "Phosphorus (mg/L)",
+      variable == "Al" ~ "Aluminum (mg/L)",
+      variable == "V" ~ "Vanadium (mg/L)",
+      variable == "B" ~ "Boron (mg/L)",
+      variable == "Fe" ~ "Iron (mg/L)",
+      variable == "Cu" ~ "Copper (mg/L)",
       TRUE ~ variable
     ),
     variable_label = factor(variable_label, 
                            levels = c("Temperature (°C)", "Salinity", "pH", 
-                                    "Dissolved O2 (mg/L)", "Suspended solids (mg/L)", "Sediment particle size (φ)")),
+                                    "Dissolved O2 (mg/L)", "Suspended solids (mg/L)", "Sediment particle size (φ)",
+                                    "Magnesium (mg/L)", "Potassium (mg/L)", "Calcium (mg/L)", "Phosphorus (mg/L)",
+                                    "Aluminum (mg/L)", "Vanadium (mg/L)", "Boron (mg/L)", "Iron (mg/L)", "Copper (mg/L)")),
     # Set the site order as requested: N1, N2, N3, N4, C5, C6, C7, C8, C9, C10, S1, S2, S3, S4, S5
     site = factor(site, levels = c("N1", "N2", "N3", "N4", "C5", "C6", "C7", "C8", "C9", "C10", 
                                   "S1", "S2", "S3", "S4", "S5"))
   )
 
-# Create individual environmental plots
+# Create individual environmental plots for environmental variables
 
 # Temperature plot
 temp_data <- env_plot_data %>% filter(variable_label == "Temperature (°C)")
@@ -261,8 +298,204 @@ env_plots_grid_leg <- plot_grid(
 # Save the combined plot
 #ggsave("environmental_variables_barplot.png", env_plots_grid_leg, width = 14, height = 12, dpi = 1200)
 
+# Create individual environmental plots for macronutrients (Mg, K, Ca, P, Al, V, B, Fe, Cu)
 
+# Magnesium plot
+mg_data <- env_plot_data %>% filter(variable_label == "Magnesium (mg/L)")
+mg_plot <- ggplot(mg_data, aes(x = site, y = value, fill = season)) +
+  geom_bar(stat = "identity", position = "dodge", width = 0.7, alpha = 0.8) +
+  scale_fill_manual(values = c("Wet" = "#72309e", "Dry" = "#9ec4e3"), name = "") +
+  labs(x = "", y = "Magnesium (mg/L)") +
+  theme_classic() +
+  #coord_cartesian(ylim = c(50, 120)) +
+  theme(
+    axis.text.x = element_text(size = 14, face = "bold", hjust = 1),
+    axis.text.y = element_text(size = 12, face = "bold"),
+    axis.title.y = element_text(size = 14, face = "bold"),
+    axis.title.x = element_blank(),
+    legend.position = "none",
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5),
+    panel.grid.minor = element_blank()
+  )
+
+# Potassium plot
+k_data <- env_plot_data %>% filter(variable_label == "Potassium (mg/L)")
+k_plot <- ggplot(k_data, aes(x = site, y = value, fill = season)) +
+  geom_bar(stat = "identity", position = "dodge", width = 0.7, alpha = 0.8) +
+  scale_fill_manual(values = c("Wet" = "#72309e", "Dry" = "#9ec4e3"), name = "") +
+  labs(x = "", y = "Potassium (mg/L)") +
+  theme_classic() +
+  #coord_cartesian(ylim = c(5, 20)) +
+  theme(
+    axis.text.x = element_text(size = 14, face = "bold", hjust = 1),
+    axis.text.y = element_text(size = 12, face = "bold"),
+    axis.title.y = element_text(size = 14, face = "bold"),
+    axis.title.x = element_blank(),
+    legend.position = "none",
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5),
+    panel.grid.minor = element_blank()
+  )
+
+# Calcium plot
+ca_data <- env_plot_data %>% filter(variable_label == "Calcium (mg/L)")
+ca_plot <- ggplot(ca_data, aes(x = site, y = value, fill = season)) +
+  geom_bar(stat = "identity", position = "dodge", width = 0.7, alpha = 0.8) +
+  scale_fill_manual(values = c("Wet" = "#72309e", "Dry" = "#9ec4e3"), name = "") +
+  labs(x = "", y = "Calcium (mg/L)") +
+  theme_classic() +
+  #coord_cartesian(ylim = c(20, 80)) +
+  theme(
+    axis.text.x = element_text(size = 14, face = "bold", hjust = 1),
+    axis.text.y = element_text(size = 12, face = "bold"),
+    axis.title.y = element_text(size = 14, face = "bold"),
+    axis.title.x = element_blank(),
+    legend.position = "none",
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5),
+    panel.grid.minor = element_blank()
+  )
+
+# Phosphorus plot
+p_data <- env_plot_data %>% filter(variable_label == "Phosphorus (mg/L)")
+p_plot <- ggplot(p_data, aes(x = site, y = value, fill = season)) +
+  geom_bar(stat = "identity", position = "dodge", width = 0.7, alpha = 0.8) +
+  scale_fill_manual(values = c("Wet" = "#72309e", "Dry" = "#9ec4e3"), name = "") +
+  labs(x = "", y = "Phosphorus (mg/L)") +
+  theme_classic() +
+  #coord_cartesian(ylim = c(0.5, 2)) +
+  theme(
+    axis.text.x = element_text(size = 14, face = "bold", hjust = 1),
+    axis.text.y = element_text(size = 12, face = "bold"),
+    axis.title.y = element_text(size = 14, face = "bold"),
+    axis.title.x = element_blank(),
+    legend.position = "none",
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5),
+    panel.grid.minor = element_blank()
+  )
+
+# Aluminum plot
+al_data <- env_plot_data %>% filter(variable_label == "Aluminum (mg/L)")
+al_plot <- ggplot(al_data, aes(x = site, y = value, fill = season)) +
+  geom_bar(stat = "identity", position = "dodge", width = 0.7, alpha = 0.8) +
+  scale_fill_manual(values = c("Wet" = "#72309e", "Dry" = "#9ec4e3"), name = "") +
+  labs(x = "", y = "Aluminum (mg/L)") +
+  theme_classic() +
+  #coord_cartesian(ylim = c(0.5, 2)) +
+  theme(
+    axis.text.x = element_text(size = 14, face = "bold", hjust = 1),
+    axis.text.y = element_text(size = 12, face = "bold"),
+    axis.title.y = element_text(size = 14, face = "bold"),
+    axis.title.x = element_blank(),
+    legend.position = "none",
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5),
+    panel.grid.minor = element_blank()
+  )
+
+# Vanadium plot
+v_data <- env_plot_data %>% filter(variable_label == "Vanadium (mg/L)")
+v_plot <- ggplot(v_data, aes(x = site, y = value, fill = season)) +
+  geom_bar(stat = "identity", position = "dodge", width = 0.7, alpha = 0.8) +
+  scale_fill_manual(values = c("Wet" = "#72309e", "Dry" = "#9ec4e3"), name = "") +
+  labs(x = "", y = "Vanadium (mg/L)") +
+  theme_classic() +
+  #coord_cartesian(ylim = c(0.1, 0.5)) +
+  theme(
+    axis.text.x = element_text(size = 14, face = "bold", hjust = 1),
+    axis.text.y = element_text(size = 12, face = "bold"),
+    axis.title.y = element_text(size = 14, face = "bold"),
+    axis.title.x = element_blank(),
+    legend.position = "none",
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5),
+    panel.grid.minor = element_blank()
+  )
+
+# Boron plot
+b_data <- env_plot_data %>% filter(variable_label == "Boron (mg/L)")
+b_plot <- ggplot(b_data, aes(x = site, y = value, fill = season)) +
+  geom_bar(stat = "identity", position = "dodge", width = 0.7, alpha = 0.8) +
+  scale_fill_manual(values = c("Wet" = "#72309e", "Dry" = "#9ec4e3"), name = "") +
+  labs(x = "", y = "Boron (mg/L)") +
+  theme_classic() +
+  #coord_cartesian(ylim = c(0.5, 2)) +
+  theme(
+    axis.text.x = element_text(size = 14, face = "bold", hjust = 1),
+    axis.text.y = element_text(size = 12, face = "bold"),
+    axis.title.y = element_text(size = 14, face = "bold"),
+    axis.title.x = element_blank(),
+    legend.position = "none",
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5),
+    panel.grid.minor = element_blank()
+  )
+
+# Iron plot
+fe_data <- env_plot_data %>% filter(variable_label == "Iron (mg/L)")
+fe_plot <- ggplot(fe_data, aes(x = site, y = value, fill = season)) +
+  geom_bar(stat = "identity", position = "dodge", width = 0.7, alpha = 0.8) +
+  scale_fill_manual(values = c("Wet" = "#72309e", "Dry" = "#9ec4e3"), name = "") +
+  labs(x = "", y = "Iron (mg/L)") +
+  theme_classic() +
+  #coord_cartesian(ylim = c(0.5, 2)) +
+  theme(
+    axis.text.x = element_text(size = 14, face = "bold", hjust = 1),
+    axis.text.y = element_text(size = 12, face = "bold"),
+    axis.title.y = element_text(size = 14, face = "bold"),
+    axis.title.x = element_blank(),
+    legend.position = "none",
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5),
+    panel.grid.minor = element_blank()
+  )
+
+# Copper plot
+cu_data <- env_plot_data %>% filter(variable_label == "Copper (mg/L)")
+cu_plot <- ggplot(cu_data, aes(x = site, y = value, fill = season)) +
+  geom_bar(stat = "identity", position = "dodge", width = 0.7, alpha = 0.8) +
+  scale_fill_manual(values = c("Wet" = "#72309e", "Dry" = "#9ec4e3"), name = "") +
+  labs(x = "", y = "Copper (mg/L)") +
+  theme_classic() +
+  #coord_cartesian(ylim = c(0.1, 0.5)) +
+  theme(
+    axis.text.x = element_text(size = 14, face = "bold", hjust = 1),
+    axis.text.y = element_text(size = 12, face = "bold"),
+    axis.title.y = element_text(size = 14, face = "bold"),
+    axis.title.x = element_blank(),
+    legend.position = "none",
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5),
+    panel.grid.minor = element_blank()
+  )
+
+# Combine macronutrient plots with cowplot and add shared legend
+macro_plots_grid <- plot_grid(
+  mg_plot, k_plot, ca_plot,
+  p_plot, al_plot, v_plot,
+  b_plot, fe_plot, cu_plot,
+  ncol = 3, nrow = 3, align = "hv",
+  labels = c("A", "B", "C", "D", "E", "F", "G", "H", "I"),
+  label_size = 16, label_fontface = "bold"
+)
+
+# Create shared legend
+legend_macro <- get_legend(
+  mg_plot +
+    scale_fill_manual(values = c("Wet" = "#72309e", "Dry" = "#9ec4e3"), name = "") +
+    theme(legend.position = "bottom",
+          legend.text = element_text(size = 14, face = "bold"),
+          legend.key.size = unit(1, "cm"))
+)
+
+# Combine plots with legend at bottom center
+macro_plots_grid_leg <- plot_grid(
+  macro_plots_grid,
+  legend_macro,
+  ncol = 1,
+  rel_heights = c(1, 0.1)
+)
+
+# Save the combined macronutrient plot
+#ggsave("macronutrients_barplot.png", macro_plots_grid_leg, width = 18, height = 14, dpi = 1200)
+
+################################################################
 ######################### VIF Analysis #########################
+################################################################
+
 # Check multicollinearity of environmental variables using VIF
 # VIF > 7 indicates multicollinearity
 env_complete <- na.omit(env_matrix)
@@ -293,6 +526,15 @@ vif_results$Variable_Label <- case_when(
   vif_results$Variable == "dissolved_o2" ~ "Dissolved O2",
   vif_results$Variable == "sediment_particle_size" ~ "Sediment particle size",
   vif_results$Variable == "suspended_solids" ~ "Suspended solids",
+  vif_results$Variable == "Mg" ~ "Magnesium",
+  vif_results$Variable == "K" ~ "Potassium",
+  vif_results$Variable == "Ca" ~ "Calcium",
+  vif_results$Variable == "P" ~ "Phosphorus",
+  vif_results$Variable == "Al" ~ "Aluminum",
+  vif_results$Variable == "V" ~ "Vanadium",
+  vif_results$Variable == "B" ~ "Boron",
+  vif_results$Variable == "Fe" ~ "Iron",
+  vif_results$Variable == "Cu" ~ "Copper",
   TRUE ~ vif_results$Variable  # Keep original name for any other variables
 )
 
@@ -312,9 +554,10 @@ vif_plot <- ggplot(vif_results, aes(x = reorder(Variable_Label, VIF), y = VIF)) 
   geom_hline(yintercept = 7, linetype = "dashed", color = "black") +
   annotate("text", x = Inf, y = 7, label = "VIF = 7", vjust = -0.5, hjust = 1.1, color = "red", size = 3)
 vif_plot
+
 # Save VIF results to CSV
-write.csv(vif_results, "vif_results.csv", row.names = FALSE)
-ggsave("vif_plot.png", vif_plot, width = 8, height = 6, dpi = 1200)
+#write.csv(vif_results, "vif_results.csv", row.names = FALSE)
+#ggsave("vif_plot.png", vif_plot, width = 8, height = 6, dpi = 1200)
 
 # Filter variables with VIF < 7
 low_vif_vars <- vif_results$Variable[vif_results$VIF < 7]
@@ -328,7 +571,10 @@ if (length(removed_vars) > 0) {
   print("No variables removed due to high VIF.")
 }
 
+###############################################################################
 ################### Canonical Correspondence Analysis (CCA) ###################
+###############################################################################
+
 # Perform CCA with VIF-filtered environmental variables
 cca_result <- cca(community_complete ~ ., data = as.data.frame(env_filtered))
 print(summary(cca_result))
@@ -343,10 +589,10 @@ print(cca_var_significance)
 
 # Save CCA results to CSV
 cca_summary <- summary(cca_result)
-write.csv(as.data.frame(cca_summary$cont$importance), "cca_eigenvalues.csv", row.names = TRUE)
-write.csv(as.data.frame(cca_summary$biplot), "cca_biplot_scores.csv", row.names = TRUE)
-write.csv(as.data.frame(cca_var_significance), "cca_variable_significance.csv", row.names = TRUE)
-write.csv(as.data.frame(cca_significance), "cca_overall_significance.csv", row.names = TRUE)
+#write.csv(as.data.frame(cca_summary$cont$importance), "cca_eigenvalues.csv", row.names = TRUE)
+#write.csv(as.data.frame(cca_summary$biplot), "cca_biplot_scores.csv", row.names = TRUE)
+#write.csv(as.data.frame(cca_var_significance), "cca_variable_significance.csv", row.names = TRUE)
+#write.csv(as.data.frame(cca_significance), "cca_overall_significance.csv", row.names = TRUE)
 
 # Create CCA biplot
 # Extract CCA scores for plotting
@@ -375,6 +621,15 @@ env_scores$env_label <- case_when(
   env_scores$env_label == "dissolved_o2" ~ "Dissolved O2",
   env_scores$env_label == "sediment_particle_size" ~ "Sediment particle size",
   env_scores$env_label == "suspended_solids" ~ "Suspended solids",
+  env_scores$env_label == "Mg" ~ "Magnesium",
+  env_scores$env_label == "K" ~ "Potassium",
+  env_scores$env_label == "Ca" ~ "Calcium",
+  env_scores$env_label == "P" ~ "Phosphorus",
+  env_scores$env_label == "Al" ~ "Aluminum",
+  env_scores$env_label == "V" ~ "Vanadium",
+  env_scores$env_label == "B" ~ "Boron",
+  env_scores$env_label == "Fe" ~ "Iron",
+  env_scores$env_label == "Cu" ~ "Copper",
   TRUE ~ env_scores$env_label  # Keep original name for any other variables
 )
 
@@ -387,8 +642,8 @@ cca_plot <- ggplot() +
             vjust = -1.0, hjust = 0.5, alpha = 0.7) +
   geom_point(data = site_scores, aes(x = CCA1, y = CCA2, color = season), 
              size = 3, alpha = 0.7) +
-  #geom_text(data = site_scores, aes(x = CCA1, y = CCA2, label = site_label), 
-  #          size = 4, vjust = -0.5, hjust = 0.5) +
+  geom_text(data = site_scores, aes(x = CCA1, y = CCA2, label = site_label), 
+            size = 4, vjust = -0.5, hjust = 0.5) +
   geom_point(data = species_scores, aes(x = CCA1, y = CCA2), 
              color = "#000000ff", size = 1.2, alpha = 0.6) +
   geom_text(data = species_scores, aes(x = CCA1, y = CCA2, label = species_label), 
@@ -409,18 +664,20 @@ cca_plot <- ggplot() +
   ) +
   geom_hline(yintercept = 0, linetype = "dashed", alpha = 0.5) +
   geom_vline(xintercept = 0, linetype = "dashed", alpha = 0.5)
-cca_plot
-# Save the plot
-#ggsave("cca_biplot_ggplot_without_samples_names.png", cca_plot, width = 12, height = 8, dpi = 1200)
 
-######################### NMDS Ordination with Environmental Fitting #########################
+# Save the plot
+#ggsave("cca_biplot_ggplot.png", cca_plot, width = 12, height = 8, dpi = 1200)
+
+################################################################################
+################## NMDS Ordination with Environmental Fitting ##################
+################################################################################
+
 # Perform NMDS with Bray-Curtis dissimilarity
 nmds_result <- metaMDS(community_complete, distance = "bray", k = 2, trymax = 100)
 print(nmds_result)
 
 # Fit environmental vectors to NMDS ordination
 env_fit <- envfit(nmds_result, env_filtered, permutations = 9999)
-print("Environmental Fitting to NMDS:")
 print(env_fit)
 
 # Create NMDS plot with environmental vectors
@@ -445,6 +702,15 @@ env_vectors$env_label <- case_when(
   env_vectors$env_label == "dissolved_o2" ~ "Dissolved O2",
   env_vectors$env_label == "sediment_particle_size" ~ "Sediment particle size",
   env_vectors$env_label == "suspended_solids" ~ "Suspended solids",
+  env_vectors$env_label == "Mg" ~ "Magnesium",
+  env_vectors$env_label == "K" ~ "Potassium",
+  env_vectors$env_label == "Ca" ~ "Calcium",
+  env_vectors$env_label == "P" ~ "Phosphorus",
+  env_vectors$env_label == "Al" ~ "Aluminum",
+  env_vectors$env_label == "V" ~ "Vanadium",
+  env_vectors$env_label == "B" ~ "Boron",
+  env_vectors$env_label == "Fe" ~ "Iron",
+  env_vectors$env_label == "Cu" ~ "Copper",
   TRUE ~ env_vectors$env_label  # Keep original name for any other variables
 )
 
@@ -488,11 +754,14 @@ nmds_plot <- ggplot() +
   # Add origin lines
   geom_hline(yintercept = 0, linetype = "dashed", alpha = 0.5, color = "gray50") +
   geom_vline(xintercept = 0, linetype = "dashed", alpha = 0.5, color = "gray50")
-nmds_plot
-# Save the plot
-#ggsave("nmds_plot_ggplot_PERMANOVA_combined.png", nmds_plot, width = 12, height = 8, dpi = 1200)
 
+# Save the plot
+ggsave("nmds_plot_ggplot_PERMANOVA_combined.png", nmds_plot, width = 12, height = 8, dpi = 1200)
+
+######################################################################
 ######################### PERMANOVA Analysis #########################
+######################################################################
+
 # Prepare data for PERMANOVA
 season_vector <- season_info
 site_vector <- combined_data$site[match(rownames(community_complete), combined_data$sampling_points)]
@@ -514,8 +783,15 @@ permanova_combined <- adonis2(community_dist ~ ., data = combined_env_data, perm
 print(permanova_combined)
 
 # Test each environmental variable separately
+# Use only the variables that passed VIF filtering (available in combined_env_data)
+# Get the variable names from env_filtered (excluding 'season' which we add separately)
+vif_filtered_vars <- colnames(combined_env_data)[colnames(combined_env_data) != "season"]
+
+# Create formula dynamically using only available variables
+permanova_formula <- as.formula(paste("community_dist ~", paste(vif_filtered_vars, collapse = " + "), "+ season"))
+
 permanova_terms <- adonis2(
-  community_dist ~ temperature + dissolved_o2 + suspended_solids + sediment_particle_size + season_vector,
+  permanova_formula,
   data = combined_env_data,
   permutations = 9999,
   by = "margin"
@@ -528,12 +804,69 @@ permutest_betadisper <- permutest(betadisper_season, permutations = 9999)
 print(permutest_betadisper)
 
 # Save PERMANOVA results to CSV
-write.csv(as.data.frame(permanova_season), "permanova_season_results.csv", row.names = TRUE)
-write.csv(as.data.frame(permanova_env), "permanova_environmental_results.csv", row.names = TRUE)
-write.csv(as.data.frame(permanova_combined), "permanova_combined_results.csv", row.names = TRUE)
-write.csv(as.data.frame(permanova_terms), "permanova_terms_results.csv", row.names = TRUE)
+#write.csv(as.data.frame(permanova_season), "permanova_season_results.csv", row.names = TRUE)
+#write.csv(as.data.frame(permanova_env), "permanova_environmental_results.csv", row.names = TRUE)
+#write.csv(as.data.frame(permanova_combined), "permanova_combined_results.csv", row.names = TRUE)
+#write.csv(as.data.frame(permanova_terms), "permanova_terms_results.csv", row.names = TRUE)
 
+###########################################################################
+############################# ANOSIM Analysis #############################
+###########################################################################
+
+# ANOSIM testing season effects
+anosim_season <- anosim(community_dist, season_vector, permutations = 9999)
+print(anosim_season)
+
+# ANOSIM testing environment effects (Serinhaem, Sorojo, Marau)
+environment_vector <- combined_data$environment[match(rownames(community_complete), combined_data$sampling_points)]
+anosim_environment <- anosim(community_dist, environment_vector, permutations = 9999)
+print(anosim_environment)
+
+# ANOSIM testing environmental variables effects
+anosim_env_results <- data.frame(
+  Variable = character(),
+  R_statistic = numeric(),
+  p_value = numeric(),
+  stringsAsFactors = FALSE
+)
+
+# Get VIF-filtered variable names
+vif_filtered_vars <- colnames(env_filtered)
+
+for (var in vif_filtered_vars) {
+  # Get the environmental variable values
+  env_values <- env_filtered[, var]
+  
+  # Create high/low groups based on median split
+  median_val <- median(env_values, na.rm = TRUE)
+  env_groups <- ifelse(env_values >= median_val, "High", "Low")
+  
+  # Run ANOSIM
+  anosim_result <- anosim(community_dist, env_groups, permutations = 9999)
+  
+  # Store results
+  anosim_env_results <- rbind(anosim_env_results, 
+                             data.frame(Variable = var,
+                                       R_statistic = anosim_result$statistic,
+                                       p_value = anosim_result$signif))
+  
+  # Print individual results
+  cat("\n", var, ":\n")
+  cat("R statistic:", round(anosim_result$statistic, 4), "\n")
+  cat("p-value:", anosim_result$signif, "\n")
+  cat("Groups: High (>=", round(median_val, 3), ") vs Low (<", round(median_val, 3), ")\n")
+}
+
+# Print summary table
+print(anosim_env_results)
+
+# Save ANOSIM results to CSV
+#write.csv(anosim_env_results, "anosim_environmental_results.csv", row.names = FALSE)
+
+##############################################################################
 ######################### Diversity Indices Analysis #########################
+##############################################################################
+
 # Calculate diversity indices
 shannon_diversity <- diversity(community_complete, index = "shannon")
 simpson_diversity <- diversity(community_complete, index = "simpson")
@@ -649,13 +982,6 @@ if (shapiro_margalef$p.value > 0.05) {
   print(margalef_test)
 }
 
-print("Summary of Normality Tests (performed on ANOVA residuals):")
-print(paste("Shannon residuals p-value:", round(shapiro_shannon$p.value, 4)))
-print(paste("Simpson residuals p-value:", round(shapiro_simpson$p.value, 4)))
-print(paste("Richness residuals p-value:", round(shapiro_richness$p.value, 4)))
-print(paste("Evenness residuals p-value:", round(shapiro_evenness$p.value, 4)))
-print(paste("Margalef residuals p-value:", round(shapiro_margalef$p.value, 4)))
-
 # Save shapiro diversity results to CSV
 shapiro_results <- data.frame(
   Diversity_Index = c("Shannon", "Simpson", "Richness", "Evenness", "Margalef"),
@@ -691,6 +1017,7 @@ diversity_long <- diversity_data %>%
 
 # Create individual plots for each diversity index with p-values
 # Format p-values for display
+# Format p-values for display
 format_p_value <- function(p_val) {
   if (p_val < 0.001) return("p < 0.001")
   if (p_val < 0.01) return(paste("p =", round(p_val, 3)))
@@ -698,19 +1025,66 @@ format_p_value <- function(p_val) {
   return(paste("p =", round(p_val, 3)))
 }
 
-shannon_plot <- ggplot(diversity_data, aes(x = season, y = shannon, fill = season)) +
-  stat_boxplot(geom = "errorbar", width = 0.15) +
-  stat_summary(fun.data = function(x) {
-    qs <- quantile(x, c(0.25, 0.75))
-    list(ymin = min(x), lower = qs[1], middle = NA, upper = qs[2], ymax = max(x))
-  }, geom = "boxplot", alpha = 1.0, outlier.shape = 16, outlier.size = 2, 
-  coef = 1.5, show.legend = FALSE) +
-  stat_summary(fun = mean, geom = "crossbar", width = 0.75, 
-               color = "black", linewidth = 2, fatten = 0) +
-  geom_jitter(width = 0.2, alpha = 0.6, size = 2) +
+# Calculate boxplot statistics with mean as middle line for all diversity indices
+shannon_stats <- diversity_data %>%
+  group_by(season) %>%
+  summarise(
+    ymin = min(shannon, na.rm = TRUE),
+    lower = quantile(shannon, 0.25, na.rm = TRUE),
+    middle = mean(shannon, na.rm = TRUE),   # mean instead of median
+    upper = quantile(shannon, 0.75, na.rm = TRUE),
+    ymax = max(shannon, na.rm = TRUE)
+  )
+
+simpson_stats <- diversity_data %>%
+  group_by(season) %>%
+  summarise(
+    ymin = min(simpson, na.rm = TRUE),
+    lower = quantile(simpson, 0.25, na.rm = TRUE),
+    middle = mean(simpson, na.rm = TRUE),   # mean instead of median
+    upper = quantile(simpson, 0.75, na.rm = TRUE),
+    ymax = max(simpson, na.rm = TRUE)
+  )
+
+richness_stats <- diversity_data %>%
+  group_by(season) %>%
+  summarise(
+    ymin = min(richness, na.rm = TRUE),
+    lower = quantile(richness, 0.25, na.rm = TRUE),
+    middle = mean(richness, na.rm = TRUE),   # mean instead of median
+    upper = quantile(richness, 0.75, na.rm = TRUE),
+    ymax = max(richness, na.rm = TRUE)
+  )
+
+evenness_stats <- diversity_data %>%
+  group_by(season) %>%
+  summarise(
+    ymin = min(evenness, na.rm = TRUE),
+    lower = quantile(evenness, 0.25, na.rm = TRUE),
+    middle = mean(evenness, na.rm = TRUE),   # mean instead of median
+    upper = quantile(evenness, 0.75, na.rm = TRUE),
+    ymax = max(evenness, na.rm = TRUE)
+  )
+
+margalef_stats <- diversity_data %>%
+  group_by(season) %>%
+  summarise(
+    ymin = min(margalef, na.rm = TRUE),
+    lower = quantile(margalef, 0.25, na.rm = TRUE),
+    middle = mean(margalef, na.rm = TRUE),   # mean instead of median
+    upper = quantile(margalef, 0.75, na.rm = TRUE),
+    ymax = max(margalef, na.rm = TRUE)
+  )
+
+shannon_plot <- ggplot(diversity_data, aes(x = season, fill = season)) +
+  geom_boxplot(
+    data = shannon_stats,
+    aes(ymin = ymin, lower = lower, middle = middle, upper = upper, ymax = ymax),
+    stat = "identity", alpha = 0.8, outlier.shape = 16, outlier.size = 2
+  ) +
+  geom_jitter(aes(y = shannon), width = 0.2, alpha = 0.6, size = 2) +
   scale_fill_manual(values = c("Wet" = "#72309e", "Dry" = "#9ec4e3")) +
-  #labs(title = "Shannon Diversity by Season",
-       labs(x = "Season", y = "Shannon Index") +
+  labs(x = "Season", y = "Shannon Index") +
   annotate("text", x = Inf, y = Inf, label = format_p_value(shannon_p_value), 
            hjust = 1.1, vjust = 1.5, size = 5, color = "black") +
   theme_classic() +
@@ -723,19 +1097,15 @@ shannon_plot <- ggplot(diversity_data, aes(x = season, y = shannon, fill = seaso
     panel.grid.minor = element_blank()
   )
 
-simpson_plot <- ggplot(diversity_data, aes(x = season, y = simpson, fill = season)) +
-  stat_boxplot(geom = "errorbar", width = 0.15) +
-  stat_summary(fun.data = function(x) {
-    qs <- quantile(x, c(0.25, 0.75))
-    list(ymin = min(x), lower = qs[1], middle = NA, upper = qs[2], ymax = max(x))
-  }, geom = "boxplot", alpha = 1.0, outlier.shape = 16, outlier.size = 2, 
-  coef = 1.5, show.legend = FALSE) +
-  stat_summary(fun = mean, geom = "crossbar", width = 0.75, 
-               color = "black", linewidth = 2, fatten = 0) +
-  geom_jitter(width = 0.2, alpha = 0.6, size = 2) +
+simpson_plot <- ggplot(diversity_data, aes(x = season, fill = season)) +
+  geom_boxplot(
+    data = simpson_stats,
+    aes(ymin = ymin, lower = lower, middle = middle, upper = upper, ymax = ymax),
+    stat = "identity", alpha = 0.8, outlier.shape = 16, outlier.size = 2
+  ) +
+  geom_jitter(aes(y = simpson), width = 0.2, alpha = 0.6, size = 2) +
   scale_fill_manual(values = c("Wet" = "#72309e", "Dry" = "#9ec4e3")) +
-  #labs(title = "Simpson Diversity by Season",
-       labs(x = "Season", y = "Simpson Index") +
+  labs(x = "Season", y = "Simpson Index") +
   annotate("text", x = Inf, y = Inf, label = format_p_value(simpson_p_value), 
            hjust = 1.1, vjust = 1.5, size = 5, color = "black") +
   theme_classic() +
@@ -748,19 +1118,15 @@ simpson_plot <- ggplot(diversity_data, aes(x = season, y = simpson, fill = seaso
     panel.grid.minor = element_blank()
   )
 
-richness_plot <- ggplot(diversity_data, aes(x = season, y = richness, fill = season)) +
-  stat_boxplot(geom = "errorbar", width = 0.15) +
-  stat_summary(fun.data = function(x) {
-    qs <- quantile(x, c(0.25, 0.75))
-    list(ymin = min(x), lower = qs[1], middle = NA, upper = qs[2], ymax = max(x))
-  }, geom = "boxplot", alpha = 1.0, outlier.shape = 16, outlier.size = 2, 
-  coef = 1.5, show.legend = FALSE) +
-  stat_summary(fun = mean, geom = "crossbar", width = 0.75, 
-               color = "black", linewidth = 2, fatten = 0) +
-  geom_jitter(width = 0.2, alpha = 0.6, size = 2) +
+richness_plot <- ggplot(diversity_data, aes(x = season, fill = season)) +
+  geom_boxplot(
+    data = richness_stats,
+    aes(ymin = ymin, lower = lower, middle = middle, upper = upper, ymax = ymax),
+    stat = "identity", alpha = 0.8, outlier.shape = 16, outlier.size = 2
+  ) +
+  geom_jitter(aes(y = richness), width = 0.2, alpha = 0.6, size = 2) +
   scale_fill_manual(values = c("Wet" = "#72309e", "Dry" = "#9ec4e3")) +
-  #labs(title = "Species Richness by Season",
-       labs(x = "Season", y = "Number of Species") +
+  labs(x = "Season", y = "Number of Species") +
   annotate("text", x = Inf, y = Inf, label = format_p_value(richness_p_value), 
            hjust = 1.1, vjust = 1.5, size = 5, color = "black") +
   theme_classic() +
@@ -773,19 +1139,15 @@ richness_plot <- ggplot(diversity_data, aes(x = season, y = richness, fill = sea
     panel.grid.minor = element_blank()
   )
 
-evenness_plot <- ggplot(diversity_data, aes(x = season, y = evenness, fill = season)) +
-  stat_boxplot(geom = "errorbar", width = 0.15) +
-  stat_summary(fun.data = function(x) {
-    qs <- quantile(x, c(0.25, 0.75))
-    list(ymin = min(x), lower = qs[1], middle = NA, upper = qs[2], ymax = max(x))
-  }, geom = "boxplot", alpha = 1.0, outlier.shape = 16, outlier.size = 2, 
-  coef = 1.5, show.legend = FALSE) +
-  stat_summary(fun = mean, geom = "crossbar", width = 0.75, 
-               color = "black", linewidth = 2, fatten = 0) +
-  geom_jitter(width = 0.2, alpha = 0.6, size = 2) +
+evenness_plot <- ggplot(diversity_data, aes(x = season, fill = season)) +
+  geom_boxplot(
+    data = evenness_stats,
+    aes(ymin = ymin, lower = lower, middle = middle, upper = upper, ymax = ymax),
+    stat = "identity", alpha = 0.8, outlier.shape = 16, outlier.size = 2
+  ) +
+  geom_jitter(aes(y = evenness), width = 0.2, alpha = 0.6, size = 2) +
   scale_fill_manual(values = c("Wet" = "#72309e", "Dry" = "#9ec4e3")) +
-  #labs(title = "Evenness by Season",
-      labs(x = "Season", y = "Pielou's Evenness") +
+  labs(x = "Season", y = "Pielou's Evenness") +
   annotate("text", x = Inf, y = Inf, label = format_p_value(evenness_p_value), 
            hjust = 1.1, vjust = 1.5, size = 5, color = "black") +
   theme_classic() +
@@ -798,19 +1160,15 @@ evenness_plot <- ggplot(diversity_data, aes(x = season, y = evenness, fill = sea
     panel.grid.minor = element_blank()
   )
 
-margalef_plot <- ggplot(diversity_data, aes(x = season, y = margalef, fill = season)) +
-  stat_boxplot(geom = "errorbar", width = 0.15) +
-  stat_summary(fun.data = function(x) {
-    qs <- quantile(x, c(0.25, 0.75))
-    list(ymin = min(x), lower = qs[1], middle = NA, upper = qs[2], ymax = max(x))
-  }, geom = "boxplot", alpha = 1.0, outlier.shape = 16, outlier.size = 2, 
-  coef = 1.5, show.legend = FALSE) +
-  stat_summary(fun = mean, geom = "crossbar", width = 0.75, 
-               color = "black", linewidth = 2, fatten = 0) +
-  geom_jitter(width = 0.2, alpha = 0.6, size = 2) +
+margalef_plot <- ggplot(diversity_data, aes(x = season, fill = season)) +
+  geom_boxplot(
+    data = margalef_stats,
+    aes(ymin = ymin, lower = lower, middle = middle, upper = upper, ymax = ymax),
+    stat = "identity", alpha = 0.8, outlier.shape = 16, outlier.size = 2
+  ) +
+  geom_jitter(aes(y = margalef), width = 0.2, alpha = 0.6, size = 2) +
   scale_fill_manual(values = c("Wet" = "#72309e", "Dry" = "#9ec4e3")) +
-  #labs(title = "Margalef Richness by Season",
-       labs(x = "Season", y = "Margalef Richness") +
+  labs(x = "Season", y = "Margalef Richness") +
   annotate("text", x = Inf, y = Inf, label = format_p_value(margalef_p_value), 
            hjust = 1.1, vjust = 1.5, size = 5, color = "black") +
   theme_classic() +
@@ -822,7 +1180,6 @@ margalef_plot <- ggplot(diversity_data, aes(x = season, y = margalef, fill = sea
     legend.position = "none",
     panel.grid.minor = element_blank()
   )
-margalef_plot
 
 diversity_combined <- plot_grid(shannon_plot, simpson_plot, richness_plot, evenness_plot,
                                ncol = 2, nrow = 2, align = "hv",
@@ -835,19 +1192,19 @@ diversity_combined_margalef <- plot_grid(shannon_plot, margalef_plot, richness_p
                                label_size = 16, label_fontface = "bold")
 
 # Save the combined plot
-ggsave("diversity_boxplots_ggplot_without_titles.png", diversity_combined, width = 12, height = 10, dpi = 1200)
-ggsave("diversity_boxplots_margalef_ggplot_without_titles.png", diversity_combined_margalef, width = 12, height = 10, dpi = 1200)
+#ggsave("diversity_boxplots_simpson.png", diversity_combined, width = 12, height = 10, dpi = 1200)
+#ggsave("diversity_boxplots_margalef.png", diversity_combined_margalef, width = 12, height = 10, dpi = 1200)
 
-#  Save individual plots
+# Save individual plots
 #ggsave("shannon_boxplot_ggplot.png", shannon_plot, width = 10, height = 8, dpi = 1200)
 #ggsave("simpson_boxplot_ggplot.png", simpson_plot, width = 10, height = 8, dpi = 1200)
 #ggsave("richness_boxplot_ggplot.png", richness_plot, width = 10, height = 8, dpi = 1200)
 #ggsave("evenness_boxplot_ggplot.png", evenness_plot, width = 10, height = 8, dpi = 1200)
 #ggsave("margalef_boxplot_ggplot.png", margalef_plot, width = 10, height = 8, dpi = 1200)
 
-
-
+###################################################################
 ######################### SIMPER Analysis #########################
+###################################################################
 
 # SIMPER analysis between seasons
 simper_seasons <- simper(community_complete, season_vector, permutations = 9999)
@@ -874,7 +1231,7 @@ if (length(simper_summary) > 0) {
 if (exists("top_species") && nrow(top_species) > 0) {
   
   # Function to create lollipop chart
-  create_simper_lollipop <- function(n_species, title_suffix) {
+  create_simper_lollipop <- function(n_species) {
     top_n <- head(top_species, n_species)
     
     # Prepare data
@@ -888,10 +1245,10 @@ if (exists("top_species") && nrow(top_species) > 0) {
     # Create lollipop chart
     lollipop_plot <- ggplot(simper_plot_data, aes(x = species, y = contribution)) +
       geom_segment(aes(x = species, xend = species, y = 0, yend = contribution), 
-                   color = "#72309e", linewidth = 1, alpha = 0.8) +
-      geom_point(color = "#72309e", size = 3, alpha = 0.9) +
+                   color = "black", linewidth = 1, alpha = 0.8) +
+      geom_point(color = "black", size = 4, alpha = 0.9) +
       geom_text(aes(label = paste0("  p = ", p_value)), 
-                hjust = -0.1, size = 2.5, fontface = "bold") +
+                hjust = -0.1, size = 5, fontface = "bold") +
       coord_flip() +
       labs(title = paste0("Top ", n_species, " Species Contributing to Seasonal Differences"),
            subtitle = "SIMPER Analysis Results",
@@ -900,10 +1257,10 @@ if (exists("top_species") && nrow(top_species) > 0) {
       theme_classic() +
       theme(
         plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
-        plot.subtitle = element_text(size = 11, hjust = 0.5, color = "gray40"),
-        axis.title = element_text(size = 12, face = "bold"),
-        axis.text.y = element_text(size = 9, face = "italic"),
-        axis.text.x = element_text(size = 10),
+        plot.subtitle = element_text(size = 12, hjust = 0.5, color = "black"),
+        axis.title = element_text(size = 14, face = "bold"),
+        axis.text.y = element_text(size = 14, face = "italic"),
+        axis.text.x = element_text(size = 14),
         panel.grid.minor = element_blank(),
         panel.grid.major.y = element_blank(),
         panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5)
@@ -916,31 +1273,19 @@ if (exists("top_species") && nrow(top_species) > 0) {
   # Create lollipop charts for different numbers of species
   # Top 10 species
   if (nrow(top_species) >= 10) {
-    simper_lollipop_10 <- create_simper_lollipop(10, "Lollipop Chart")
-    print("Top 10 species lollipop chart created")
-    #ggsave("simper_lollipop_top10.png", simper_lollipop_10, width = 10, height = 8, dpi = 1200)
+    simper_lollipop_10 <- create_simper_lollipop(10)
+    ggsave("simper_lollipop_top10_with_p_values.png", simper_lollipop_10, width = 10, height = 8, dpi = 1200)
   }
   
   # Top 25 species
   if (nrow(top_species) >= 25) {
-    simper_lollipop_25 <- create_simper_lollipop(25, "Extended View")
-    print("Top 25 species lollipop chart created")
-    #ggsave("simper_lollipop_top25.png", simper_lollipop_25, width = 12, height = 14, dpi = 1200)
+    simper_lollipop_25 <- create_simper_lollipop(25)
+    ggsave("simper_lollipop_top25_with_p_values.png", simper_lollipop_25, width = 12, height = 14, dpi = 1200)
   }
   
   # Top 50 species
   if (nrow(top_species) >= 50) {
-    simper_lollipop_50 <- create_simper_lollipop(50, "Comprehensive View")
-    print("Top 50 species lollipop chart created")
-    #ggsave("simper_lollipop_top50.png", simper_lollipop_50, width = 14, height = 20, dpi = 1200)
+    simper_lollipop_50 <- create_simper_lollipop(50)
+    ggsave("simper_lollipop_top50_with_p_values.png", simper_lollipop_50, width = 14, height = 20, dpi = 1200)
   }
-  
-  # Print summary of available charts
-  available_charts <- c()
-  if (nrow(top_species) >= 10) available_charts <- c(available_charts, "Top 10")
-  if (nrow(top_species) >= 25) available_charts <- c(available_charts, "Top 25") 
-  if (nrow(top_species) >= 50) available_charts <- c(available_charts, "Top 50")
-  
-  print(paste("SIMPER lollipop charts created for:", paste(available_charts, collapse = ", ")))
-  print(paste("Total species available for SIMPER analysis:", nrow(top_species)))
 }
