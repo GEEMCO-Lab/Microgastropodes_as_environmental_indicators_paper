@@ -1,6 +1,6 @@
 # R Script: microgastropodes_env_analyses_eduhcgalvao.R
 # Author: Eduardo HC Galvao - eduardohcgalvao@gmail.com
-# Version: 2.0 (13/10/2025)
+# Version: 2.5 (22/10/2025)
 # Date: 12/10/2025 (dd/mm/yyyy) #nolint
 # Description: Analyses to investigate microgastropodes in three different
 # pristine river basins in Brazil.
@@ -8,7 +8,6 @@
 # The workflow includes:
 # 1) Data import and cleaning
 # 2) Environmental data analyses: test differences between river basins
-# macronutrients (Mg, K, Ca, P, Al, V, B, Fe, Cu) and environmental factors
 # (pH, temperature, salinity, dissolved oxygen, suspended solids,
 # sediment particle size) in those three river basins and across seasons.
 # 3) Diversity analyses: compare differences in shannon-wiener, number of
@@ -49,7 +48,6 @@ set.seed(123) # For reproducibility
 setwd("C:/Users/Kelmo/Desktop/eduardo/Microgastropodes_as_environmental_indicators")
 
 # Load data
-env_macro_data <- read.csv("data/macronutrients_data_microgastropodes.csv")
 env_var_data <- read.csv("data/env_data_microgastropodes.csv")
 community_data <- read.csv("data/community_data_microgastropodes.csv")
 
@@ -101,25 +99,17 @@ combined_data <- merge(site_season_data,
                        by.y = c("sampling_points", "season"), 
                        suffixes = c("", "_env_var"))
 
-# Merge macronutrients data with combined data by environment and season
-combined_data <- merge(combined_data,
-                       env_macro_data, 
-                       by = c("environment", "season"), 
-                       suffixes = c("", "_macro"))
-
 # Ensure the order matches the community matrix
 combined_data <- combined_data[match(site_season_data$sampling_points,
                                         combined_data$sampling_points),]
 
-# Create environmental matrix for analyses (including macronutrients)
+# Create environmental matrix for analyses
 env_matrix <- combined_data[, c("temperature",
                                 "salinity",
                                 "pH",
                                 "dissolved_o2",
                                 "suspended_solids", 
-                               "sediment_particle_size",
-                               "Mg", "K", "Ca", "P", "Al",
-                               "V", "B", "Fe", "Cu")]
+                                "sediment_particle_size")]
 rownames(env_matrix) <- combined_data$sampling_points
 
 # Write down a summary of abundance data for season and river basin
@@ -134,32 +124,31 @@ abundance_summary <- data.frame(
 ######################### Environmental data analyses #########################
 ###############################################################################
 
-# Calculate mean and sd for macronutrients by environment
-macro_nutrients <- c("Mg", "K", "Ca", "P", "Al", "V", "B", "Fe", "Cu")
+# Calculate mean and sd of environmental variables by environment
 environments <- c("Serinhaem", "Sorojo", "Marau")
 seasons <- c("Dry", "Wet")
 env_variables <- c("temperature", "salinity", "pH", "dissolved_o2",
                    "suspended_solids", "sediment_particle_size")
 
 # Define function to compute statistics for groups
-compute_stats <- function(data, group_var, group_values, nutrient_list) {
+compute_stats <- function(data, group_var, group_values, var_list) {
   result <- data.frame()
   
   for (val in group_values) {
     subset_data <- data[data[[group_var]] == val, ]
     
-    for (nutrient in nutrient_list) {
-      if (nutrient %in% colnames(subset_data)) {
-        nutrient_values <- subset_data[[nutrient]]
-        nutrient_values <- nutrient_values[!is.na(nutrient_values)]
+    for (var in var_list) {
+      if (var %in% colnames(subset_data)) {
+        var_values <- subset_data[[var]]
+        var_values <- var_values[!is.na(var_values)]
         
-        if (length(nutrient_values) > 0) {
+        if (length(var_values) > 0) {
           result <- rbind(result, data.frame(
             Group = val,
-            Variable = nutrient,
-            Mean = round(mean(nutrient_values), 3),
-            SD = round(sd(nutrient_values), 3),
-            N = length(nutrient_values)
+            Variable = var,
+            Mean = round(mean(var_values), 3),
+            SD = round(sd(var_values), 3),
+            N = length(var_values)
           ))
         }
       }
@@ -168,32 +157,6 @@ compute_stats <- function(data, group_var, group_values, nutrient_list) {
   
   return(result)
 }
-
-# Calculate statistics for each environment and macronutrient
-macro_stats_by_env <- compute_stats(combined_data, "environment",
-                                      environments, macro_nutrients)
-names(macro_stats_by_env)[1] <- "Environment"
-
-# Calculate statistics for each season and macronutrient
-macro_stats_by_season <- compute_stats(combined_data, "season",
-                                          seasons, macro_nutrients)
-names(macro_stats_by_season)[1] <- "Season"
-
-# Create a more readable table format
-macro_wide <- reshape(macro_stats_by_env[, c("Environment", "Variable",
-                                                            "Mean", "SD")], 
-                      idvar = "Variable", 
-                      timevar = "Environment", 
-                      direction = "wide")
-
-#print(macro_wide)
-
-# Save environment results
-#write.csv(macro_stats_by_env, "results/macronutrients_stats_by_environment.csv", row.names = FALSE)
-#write.csv(macro_wide, "results/macronutrients_summary_table.csv", row.names = FALSE)
-
-# Save seasonal results
-#write.csv(macro_stats_by_season, "results/macronutrients_seasonal_stats.csv", row.names = FALSE)
 
 ################################################################################
 
@@ -272,16 +235,6 @@ perform_statistical_tests <- function(data, variables, grouping_var) {
   return(result)
 }
 
-# Test differences in macronutrients between environments
-macro_env_dif_results <- perform_statistical_tests(combined_data_filtered,
-                                                   macro_nutrients,
-                                                   "environment")
-
-# Test differences in macronutrients between seasons
-macro_season_dif_results <- perform_statistical_tests(combined_data_filtered,
-                                                      macro_nutrients,
-                                                      "season")
-
 # Test differences in environmental variables between environments
 env_dif_results <- perform_statistical_tests(combined_data,
                                              env_variables,
@@ -292,14 +245,10 @@ env_season_dif_results <- perform_statistical_tests(combined_data,
                                                     env_variables,
                                                     "season")
 
-#print(macro_env_dif_results)
-#print(macro_season_dif_results)
 #print(env_dif_results)
 #print(env_season_dif_results)
 
 # Save results
-#write.csv(macro_season_dif_results, "results/macronutrients_season_anova_kruskal_results.csv", row.names = FALSE)
-#write.csv(macro_env_dif_results, "results/macronutrients_river_anova_kruskal_results.csv", row.names = FALSE)
 #write.csv(env_dif_results, "results/environmental_variables_river_anova_kruskal_results.csv", row.names = FALSE)
 #write.csv(env_season_dif_results, "results/environmental_variables_season_anova_kruskal_results.csv", row.names = FALSE)
 
@@ -1309,4 +1258,5 @@ simper_final_panel <- plot_grid(
 # Save the individual plots and combined panel
 #ggsave("results/simper_season_lollipop.png", simper_season_plot, width = 10, height = 8, dpi = 1200)
 #ggsave("results/simper_environment_lollipop.png", simper_environment_plot, width = 10, height = 8, dpi = 1200)
+
 #ggsave("results/simper_combined_panel.png", simper_final_panel, width = 16, height = 10, dpi = 1200)
