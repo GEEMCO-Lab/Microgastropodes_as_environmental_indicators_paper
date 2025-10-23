@@ -15,9 +15,9 @@ It explores how environmental variables influence community structure, diversity
 │   ├── env_data_microgastropodes.csv           # Environmental variables (pH, salinity, DO, etc.)
 │   ├── community_data_microgastropodes.csv     # Species abundance matrix
 │
-├── Results/
-│   ├── Statistical analysis                    # Statistical summaries, ANOVA, PERMANOVA, VIF, GAM outputs
-│   ├── Plots                                   # Visualization panels (diversity, environmental, NMDS, GAM)
+├── results/
+│   ├── statistical_analysis                    # Statistical summaries, ANOVA, PERMANOVA, VIF, GAM outputs
+│   ├── plots                                   # Visualization panels (diversity, environmental, NMDS, GAM)
 │
 ├── microgastropodes_env_analyses_eduhcgalvao.R # Main R analysis script
 │
